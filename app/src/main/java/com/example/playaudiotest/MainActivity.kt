@@ -11,6 +11,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,17 +21,26 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DensityMedium
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,12 +66,13 @@ class MainActivity : ComponentActivity() {
         factoryProducer = {
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return MainViewModel(mediaReader, player) as T
+                    return MainViewModel(mediaReader,player) as T
                 }
             }
         }
     )
 
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -79,8 +90,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PlayAudioTestTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val loadingAudioFiles by viewModel.loadingAudioFiles.collectAsStateWithLifecycle()
+                MoreDrawer(
+                    context = applicationContext,
+                    modifier = Modifier.fillMaxSize(),
+                    viewModel
+                ) { innerPadding ->
                     val scrollState = rememberScrollState()
                     Column (
                         modifier = Modifier
@@ -89,7 +103,7 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (viewModel.playState) {
+                        if (viewModel.playListState) {
                             AsyncImage(
                                 model = viewModel.currentPlayAudio.albumArt,
                                 contentDescription = null,
@@ -97,11 +111,13 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxWidth()
                                     .size(300.dp)
                             )
+                            Spacer(Modifier.size(16.dp))
                             Text(
                                 text = viewModel.currentPlayAudio.title,
-                                textAlign = TextAlign.Center,
                                 fontSize = 24.sp,
-                                modifier = Modifier.fillMaxWidth()
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
                             )
                             Column(
                                 modifier = Modifier
@@ -113,59 +129,62 @@ class MainActivity : ComponentActivity() {
                                     fontSize = 14.sp,
                                     color = Color.Gray,
                                     maxLines = 1,
-                                    textAlign = TextAlign.Center,
+                                    textAlign = TextAlign.Start,
                                     modifier = Modifier.align(Alignment.CenterHorizontally)
                                 )
-                            }
-                            AudioTimeLine(viewModel)
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        viewModel.playAudioController()
-                                    },
-                                    modifier = Modifier.weight(0.5f)
-                                ) {
-                                    Icon(
-                                        rememberVectorPainter(viewModel.playerControllerIcon),
-                                        contentDescription = null
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        viewModel.clearPlayAudios()
-                                    },
-                                    modifier = Modifier.weight(0.5f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Stop,
-                                        contentDescription = null
-                                    )
-                                }
                             }
                         } else Text(
                             text = "Nothing to play.",
                             textAlign = TextAlign.Center,
                             fontSize = 24.sp,
                             modifier = Modifier
-                                .size(400.dp)
-                                .align(Alignment.CenterHorizontally)
+                                .fillMaxWidth()
+                                .size(350.dp)
                         )
-                        if (loadingAudioFiles) {
-                            CircularProgressIndicator()
-                        }
-                        else {
-                            LazyColumn (modifier = Modifier.fillMaxWidth()) {
-                                items(viewModel.audioFiles) {
-                                    AudioListItem(
-                                        file = it,
-                                        viewModel = viewModel,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
+                        AudioTimeLine(viewModel)
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    viewModel.playPrevious()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SkipPrevious,
+                                    contentDescription = null
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    viewModel.playAudioController()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    painter = rememberVectorPainter(viewModel.playerControllerIcon),
+                                    contentDescription = null
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    viewModel.playNext()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SkipNext,
+                                    contentDescription = null
+                                )
                             }
                         }
+                        PlayListSheet(
+                            viewModel,
+                            modifier = Modifier
+                                .align(Alignment.Start)
+                                .padding(16.dp)
+                        )
                     }
                 }
             }

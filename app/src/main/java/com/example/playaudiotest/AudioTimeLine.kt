@@ -1,5 +1,6 @@
 package com.example.playaudiotest
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberScrollableState
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -53,23 +55,30 @@ fun AudioTimeLine(viewModel: MainViewModel) {
     }
 
     val state = rememberScrollableState { delta ->
-        offset = (offset + delta).roundToInt().coerceIn(0, timeLineLength)
-        viewModel.changePlayPosition((offset.toFloat() / timeLineLength * viewModel.currentPlayAudio.duration).roundToLong())
+        if (viewModel.currentDuration>0) {
+            offset = (offset + delta).roundToInt().coerceIn(0, timeLineLength)
+            viewModel.changePlayPosition((offset.toFloat() / timeLineLength * viewModel.currentDuration).roundToLong())
+        }
         delta
     }
+
+    val getCurrentPosition by viewModel.getCurrentPosition.collectAsStateWithLifecycle()
 
     rememberCoroutineScope().also {
         it.launch {
             state.scroll {
-                currentPlayPosition =
-                    viewModel.currentPosition.toFloat() / viewModel.currentPlayAudio.duration.toFloat() * timeLineLength
-                offset = currentPlayPosition.roundToInt()
+                if (viewModel.currentDuration > 0){
+                    currentPlayPosition =
+                        getCurrentPosition.toFloat()/ viewModel.currentDuration.toFloat() * timeLineLength
+                    offset = currentPlayPosition.roundToInt()
+              } else offset = 0
             }
         }
     }
 
     Row(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
             .padding(20.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -91,7 +100,7 @@ fun AudioTimeLine(viewModel: MainViewModel) {
             )
             Box(
                 modifier = Modifier
-                    .width(with(LocalDensity.current) {offset.toDp()} + 3.dp)
+                    .width(with(LocalDensity.current) { offset.toDp() } + 3.dp)
                     .height(4.dp)
                     .background(Color.Black, RoundedCornerShape(4.dp))
                     .align(Alignment.CenterStart)
@@ -115,7 +124,7 @@ fun AudioTimeLine(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(3f)
                 .align(Alignment.CenterVertically),
-            text = "${formatTime(viewModel.currentPosition)}/${formatTime(viewModel.currentPlayAudio.duration)}",
+            text = "${formatTime(getCurrentPosition)}/${formatTime(viewModel.currentDuration)}",
             fontSize = 14.sp,
             textAlign = TextAlign.Center
         )
