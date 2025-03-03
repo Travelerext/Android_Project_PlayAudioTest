@@ -63,10 +63,10 @@ fun PlayListSheet(
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    items(viewModel.playList.toList()) { uri ->
+                    items(viewModel.playList.toList()) { file ->
                         PlayListItem(
-                            uri,
-                            viewModel.playList.indexOf(uri),
+                            file,
+                            viewModel.playList.indexOf(file),
                             viewModel
                         )
                         Spacer(modifier = Modifier.size(16.dp))

@@ -17,37 +17,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DensityMedium
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import coil.compose.AsyncImage
 import com.example.playaudiotest.ui.theme.PlayAudioTestTheme
@@ -141,7 +127,7 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxWidth()
                                 .size(350.dp)
                         )
-                        AudioTimeLine(viewModel)
+                        ProgressBar(viewModel)
                         Row(
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -163,7 +149,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(
-                                    painter = rememberVectorPainter(viewModel.playerControllerIcon),
+                                    imageVector = viewModel.playerControllerIcon,
                                     contentDescription = null
                                 )
                             }

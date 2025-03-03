@@ -1,6 +1,5 @@
 package com.example.playaudiotest
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberScrollableState
@@ -40,7 +39,7 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 @Composable
-fun AudioTimeLine(viewModel: MainViewModel) {
+fun ProgressBar(viewModel: MainViewModel) {
 
     var timeLineLength by remember {
         mutableIntStateOf(0)
@@ -132,8 +131,8 @@ fun AudioTimeLine(viewModel: MainViewModel) {
 }
 
 fun formatTime(duration: Long): String {
-    val minute = duration/1000/60
-    val second = duration/1000%60
+    val minute = (duration.toFloat()/1000).roundToLong()/60
+    val second = (duration.toFloat()/1000).roundToLong()%60
     val result =
         if (duration >= 0)
             "%02d:%02d".format(minute, second)

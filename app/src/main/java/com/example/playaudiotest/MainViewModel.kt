@@ -1,18 +1,14 @@
 package com.example.playaudiotest
 
 import android.net.Uri
-import android.util.Log
-import android.widget.Toast
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -23,7 +19,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -36,8 +31,8 @@ class MainViewModel(
 
     var playerControllerIcon by mutableStateOf(Icons.Filled.PlayArrow)
     var playListState by mutableStateOf(false)
-    var playList = mutableListOf<Uri>()
-
+    var playList = mutableStateListOf<AudioFile>()
+    var audioStateList = mutableStateListOf<Boolean>()
 
     init {
         initPlayer()
@@ -45,11 +40,11 @@ class MainViewModel(
 
     var currentPlayAudio by mutableStateOf(
         AudioFile(
-        contentUri = Uri.EMPTY,
-        title = "Unknown",
-        artists = "Unknown",
-        duration = 0L,
-        albumArt = Uri.parse("android.resource://com.example.playaudiotest/drawable/album")
+            contentUri = Uri.EMPTY,
+            title = "Unknown",
+            artists = "Unknown",
+            duration = 0L,
+            albumArt = Uri.parse("android.resource://com.example.playaudiotest/drawable/album")
         )
     )
         private set
@@ -71,28 +66,26 @@ class MainViewModel(
         viewModelScope.launch {
             _loadingAudioFiles.value = true
             audioFiles = mediaReader.getAllAudioFiles()
+            repeat(audioFiles.size) {
+                audioStateList.add(false)
+            }
             _loadingAudioFiles.value = false
         }
     }
 
     var currentDuration by mutableLongStateOf(0L)
     private val _getCurrentPosition = MutableStateFlow(0L)
-
     val getCurrentPosition = _getCurrentPosition
-        .onStart { updatingCurrentPosition() }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.Eagerly,
-            0L
-        )
+        .asStateFlow()
 
 
     private fun updatingCurrentPosition() {
         viewModelScope.launch {
-            while (true) {
-                _getCurrentPosition.value = player.currentPosition
-                currentDuration = player.duration
-                delay(1000L)
+            while (player.isPlaying) {
+                _getCurrentPosition.update {
+                    player.currentPosition
+                }
+                delay(100L)
             }
         }
     }
@@ -115,12 +108,21 @@ class MainViewModel(
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         super.onIsPlayingChanged(isPlaying)
                         playerControllerIcon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+                        if (isPlaying)
+                            updatingCurrentPosition()
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         super.onMediaItemTransition(mediaItem, reason)
-                        audioFiles.find { it.contentUri == player.currentMediaItem?.localConfiguration?.uri }?.let { audioFile ->
-                            currentPlayAudio = audioFile
+                        _getCurrentPosition.update { 0L }
+                        if (mediaItem != null){
+                            audioFiles.find { it.contentUri == mediaItem.localConfiguration?.uri }
+                                ?.let { audioFile ->
+                                    currentPlayAudio = audioFile
+                                }
+                            currentDuration = currentPlayAudio.duration
+                        } else {
+                            currentDuration = 0L
                         }
                     }
 
@@ -128,11 +130,18 @@ class MainViewModel(
                         super.onTimelineChanged(timeline, reason)
                         playListState = player.mediaItemCount > 0
                         playList.clear()
-                        audioFiles.map { it.isInList.value = false }
+                        audioStateList.fill(false)
                         for (i in 0 until player.mediaItemCount) {
                             player.getMediaItemAt(i).localConfiguration?.let { config ->
-                                playList.add(config.uri)
-                                audioFiles.find { config.uri == it.contentUri }?.isInList?.value = true
+                                val audioFile = audioFiles.find { it.contentUri == config.uri }?:AudioFile(
+                                    contentUri = Uri.EMPTY,
+                                    title = "Unknown",
+                                    artists = "Unknown",
+                                    duration = 0L,
+                                    albumArt = Uri.parse("android.resource://com.example.playaudiotest/drawable/album")
+                                )
+                                playList.add(audioFile)
+                                audioStateList[audioFiles.indexOf(audioFile)] = true
                             }
                         }
                     }
@@ -142,7 +151,7 @@ class MainViewModel(
     }
 
     fun addToPlayList(audioFile: AudioFile) {
-        if (!audioFile.isInList.value) {
+        if (!audioStateList[audioFiles.indexOf(audioFile)]) {
             player.addMediaItem(MediaItem.fromUri(audioFile.contentUri))
         }
     }
@@ -175,6 +184,7 @@ class MainViewModel(
 
     fun changePlayPosition(position: Long) {
         player.seekTo(position)
+        _getCurrentPosition.update { player.currentPosition }
     }
 
     fun clearPlayAudios() {
