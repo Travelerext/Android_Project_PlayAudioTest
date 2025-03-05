@@ -1,119 +1,76 @@
 package com.example.playaudiotest
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.rememberScrollableState
-import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressBar(viewModel: MainViewModel) {
 
-    var timeLineLength by remember {
-        mutableIntStateOf(0)
-    }
-
-    var offset by remember {
-        mutableIntStateOf(0)
-    }
-
-    var currentPlayPosition by remember {
-        mutableFloatStateOf(0f)
-    }
-
-    val state = rememberScrollableState { delta ->
-        if (viewModel.currentDuration>0) {
-            offset = (offset + delta).roundToInt().coerceIn(0, timeLineLength)
-            viewModel.changePlayPosition((offset.toFloat() / timeLineLength * viewModel.currentDuration).roundToLong())
-        }
-        delta
-    }
-
-    val getCurrentPosition by viewModel.getCurrentPosition.collectAsStateWithLifecycle()
-
-    rememberCoroutineScope().also {
-        it.launch {
-            state.scroll {
-                if (viewModel.currentDuration > 0){
-                    currentPlayPosition =
-                        getCurrentPosition.toFloat()/ viewModel.currentDuration.toFloat() * timeLineLength
-                    offset = currentPlayPosition.roundToInt()
-              } else offset = 0
-            }
-        }
-    }
+    val currentPosition by viewModel.getCurrentPosition.collectAsStateWithLifecycle()
+    val interactionSource = remember { MutableInteractionSource() }
+    val colors = SliderDefaults.colors(
+        thumbColor = Color.Black,
+        activeTrackColor = Color.Black,
+        disabledActiveTrackColor = Color.Gray
+    )
+    val sliderPosition = if (viewModel.currentDuration > 0) {
+        currentPosition.toFloat()/viewModel.currentDuration
+    } else 0f
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(20.dp)
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
-        Box(
+        Column (
             modifier = Modifier
                 .weight(7f)
-                .height(20.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .background(Color.Gray, RoundedCornerShape(4.dp))
-                    .onSizeChanged { size ->
-                        timeLineLength = size.width - 6
-                    }
-            )
-            Box(
-                modifier = Modifier
-                    .width(with(LocalDensity.current) { offset.toDp() } + 3.dp)
-                    .height(4.dp)
-                    .background(Color.Black, RoundedCornerShape(4.dp))
-                    .align(Alignment.CenterStart)
-            )
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(x = offset, y = 0) }
-                    .size(8.dp)
-                    .background(Color.Black, CircleShape)
-                    .align(Alignment.CenterStart)
-                    .scrollable(
-                        orientation = Orientation.Horizontal,
-                        state = state
+        )
+        {
+            Slider(
+                value = sliderPosition,
+                onValueChange = { value ->
+                    viewModel.changePlayPosition((value / 1 * viewModel.currentDuration).roundToLong())
+                },
+                interactionSource = interactionSource,
+                colors = colors,
+                thumb = {
+                    Icon(
+                        imageVector = Icons.Filled.Circle,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .padding(7.dp),
+                        tint = Color.Black
                     )
+                },
             )
         }
         Spacer(
@@ -123,7 +80,7 @@ fun ProgressBar(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(3f)
                 .align(Alignment.CenterVertically),
-            text = "${formatTime(getCurrentPosition)}/${formatTime(viewModel.currentDuration)}",
+            text = "${formatTime(currentPosition)}/${formatTime(viewModel.currentDuration)}",
             fontSize = 14.sp,
             textAlign = TextAlign.Center
         )
