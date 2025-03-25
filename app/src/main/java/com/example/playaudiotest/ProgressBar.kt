@@ -31,7 +31,6 @@ import kotlin.math.roundToLong
 @Composable
 fun ProgressBar(viewModel: MainViewModel) {
 
-    val currentPosition by viewModel.getCurrentPosition.collectAsStateWithLifecycle()
     val interactionSource = remember { MutableInteractionSource() }
     val colors = SliderDefaults.colors(
         thumbColor = Color.Black,
@@ -39,7 +38,7 @@ fun ProgressBar(viewModel: MainViewModel) {
         disabledActiveTrackColor = Color.Gray
     )
     val sliderPosition = if (viewModel.currentDuration > 0) {
-        currentPosition.toFloat()/viewModel.currentDuration
+        viewModel.currentPosition.toFloat()/viewModel.currentDuration
     } else 0f
 
     Row(
@@ -80,7 +79,7 @@ fun ProgressBar(viewModel: MainViewModel) {
             modifier = Modifier
                 .weight(3f)
                 .align(Alignment.CenterVertically),
-            text = "${formatTime(currentPosition)}/${formatTime(viewModel.currentDuration)}",
+            text = "${formatTime(viewModel.currentPosition)}/${formatTime(viewModel.currentDuration)}",
             fontSize = 14.sp,
             textAlign = TextAlign.Center
         )

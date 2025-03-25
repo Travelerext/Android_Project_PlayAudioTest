@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -72,7 +72,7 @@ fun AudioListItem(
             modifier = Modifier.weight(2f)
         ) {
             Icon(
-                imageVector = Icons.Filled.Add,
+                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                 contentDescription = null,
                 tint = if (viewModel.audioStateList[viewModel.audioFiles.indexOf(file)]) Color.Green else Color.Black
             )

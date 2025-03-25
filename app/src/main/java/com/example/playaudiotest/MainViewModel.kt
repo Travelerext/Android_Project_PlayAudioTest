@@ -1,10 +1,15 @@
 package com.example.playaudiotest
 
+import android.content.ComponentName
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -14,28 +19,27 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
-import androidx.media3.exoplayer.ExoPlayer
-import kotlinx.coroutines.delay
+import androidx.media3.session.MediaController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class MainViewModel(
     private val mediaReader: MediaReader,
-    private val player: ExoPlayer
 ): ViewModel() {
 
-    var playerControllerIcon by mutableStateOf(Icons.Filled.PlayArrow)
+    private lateinit var mediaController: MediaController
+    var playControllerIcon by mutableStateOf(Icons.Filled.PlayArrow)
     var playListState by mutableStateOf(false)
     var playList = mutableStateListOf<AudioFile>()
     var audioStateList = mutableStateListOf<Boolean>()
+    var selectedItemIndex by mutableIntStateOf(0)
 
-    init {
-        initPlayer()
+    fun getMediaController(mediaController: MediaController) {
+        this.mediaController = mediaController
+        initMediaController()
     }
 
     var currentPlayAudio by mutableStateOf(
@@ -47,7 +51,6 @@ class MainViewModel(
             albumArt = Uri.parse("android.resource://com.example.playaudiotest/drawable/album")
         )
     )
-        private set
 
     private val _loadingAudioFiles = MutableStateFlow(false)
 
@@ -59,62 +62,62 @@ class MainViewModel(
             false
         )
 
-    var audioFiles by mutableStateOf(listOf<AudioFile>())
+    var audioFiles = mutableStateListOf<AudioFile>()
         private set
+
+    var albumList = mutableStateListOf<Album>()
 
     private fun loadAudioFiles() {
         viewModelScope.launch {
-            _loadingAudioFiles.value = true
-            audioFiles = mediaReader.getAllAudioFiles()
+            _loadingAudioFiles.value = false
+            audioFiles.clear()
+            audioFiles.addAll(mediaReader.getAllAudioFiles())
+            albumList.clear()
+            albumList.addAll(mediaReader.getAlbumList())
             repeat(audioFiles.size) {
                 audioStateList.add(false)
             }
-            _loadingAudioFiles.value = false
+            _loadingAudioFiles.value = true
         }
     }
 
     var currentDuration by mutableLongStateOf(0L)
-    private val _getCurrentPosition = MutableStateFlow(0L)
-    val getCurrentPosition = _getCurrentPosition
-        .asStateFlow()
+    var currentPosition by mutableLongStateOf(0L)
+    val handler = Handler(Looper.getMainLooper())
+    fun checkPlaybackPosition(delayMs: Long): Boolean =
+        handler.postDelayed(
+            {
+                currentPosition = mediaController.currentPosition
+                if (mediaController.isPlaying)
+                    checkPlaybackPosition(delayMs)
+            },
+            delayMs)
 
-
-    private fun updatingCurrentPosition() {
-        viewModelScope.launch {
-            while (player.isPlaying) {
-                _getCurrentPosition.update {
-                    player.currentPosition
-                }
-                delay(100L)
-            }
-        }
-    }
-
-    private fun initPlayer()
+    private fun initMediaController()
     {
         viewModelScope.launch{
-            player.prepare()
-            player.addListener(
+            playControllerIcon = if (mediaController.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+            checkPlaybackPosition(100L)
+            mediaController.addListener(
                 object : Player.Listener {
 
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         super.onPlaybackStateChanged(playbackState)
                         if (playbackState == Player.STATE_ENDED) {
-                            player.pause()
-                            player.seekTo(0, 0)
+                            mediaController.pause()
+                            mediaController.seekTo(0, 0)
                         }
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         super.onIsPlayingChanged(isPlaying)
-                        playerControllerIcon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+                        playControllerIcon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
                         if (isPlaying)
-                            updatingCurrentPosition()
+                            checkPlaybackPosition(100L)
                     }
 
                     override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         super.onMediaItemTransition(mediaItem, reason)
-                        _getCurrentPosition.update { 0L }
                         if (mediaItem != null){
                             audioFiles.find { it.contentUri == mediaItem.localConfiguration?.uri }
                                 ?.let { audioFile ->
@@ -128,11 +131,11 @@ class MainViewModel(
 
                     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                         super.onTimelineChanged(timeline, reason)
-                        playListState = player.mediaItemCount > 0
+                        playListState = mediaController.mediaItemCount > 0
                         playList.clear()
                         audioStateList.fill(false)
-                        for (i in 0 until player.mediaItemCount) {
-                            player.getMediaItemAt(i).localConfiguration?.let { config ->
+                        for (i in 0 until mediaController.mediaItemCount) {
+                            mediaController.getMediaItemAt(i).localConfiguration?.let { config ->
                                 val audioFile = audioFiles.find { it.contentUri == config.uri }?:AudioFile(
                                     contentUri = Uri.EMPTY,
                                     title = "Unknown",
@@ -152,47 +155,60 @@ class MainViewModel(
 
     fun addToPlayList(audioFile: AudioFile) {
         if (!audioStateList[audioFiles.indexOf(audioFile)]) {
-            player.addMediaItem(MediaItem.fromUri(audioFile.contentUri))
+            mediaController.addMediaItem(MediaItem.fromUri(audioFile.contentUri))
         }
     }
 
+    fun addToPlayList(audioList: List<AudioFile>) {
+        audioList.forEach{
+            if (!audioStateList[audioFiles.indexOf(it)])
+                mediaController.addMediaItem(MediaItem.fromUri(it.contentUri))
+        }
+    }
+
+    fun addToPlayList(album: Album) {
+        val items = mutableListOf<MediaItem>()
+        album.audioList.forEach{ items.add(MediaItem.fromUri(it.contentUri)) }
+        mediaController.setMediaItems(items)
+        mediaController.play()
+    }
+
     fun changePlayingAudio(index: Int) {
-        player.seekTo(index, 0)
-        player.play()
+        mediaController.seekTo(index, 0)
+        mediaController.play()
     }
 
     fun deleteFromPlayList(index: Int) {
-        player.removeMediaItem(index)
+        mediaController.removeMediaItem(index)
     }
 
     fun playAudioController() {
-        if (player.isPlaying)
-            player.pause()
+        if (mediaController.isPlaying)
+            mediaController.pause()
         else
-            player.play()
+            mediaController.play()
     }
 
     fun playNext() {
-        player.seekToNext()
-        player.play()
+        mediaController.seekToNext()
+        mediaController.play()
     }
 
     fun playPrevious() {
-        player.seekToPrevious()
-        player.play()
+        mediaController.seekToPrevious()
+        mediaController.play()
     }
 
     fun changePlayPosition(position: Long) {
-        player.seekTo(position)
-        _getCurrentPosition.update { player.currentPosition }
+        mediaController.seekTo(position)
     }
 
     fun clearPlayAudios() {
-        player.clearMediaItems()
+        mediaController.clearMediaItems()
     }
 
     override fun onCleared() {
         super.onCleared()
-        player.release()
+        mediaController.release()
     }
 }

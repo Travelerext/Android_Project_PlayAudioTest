@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">PlayAudioTest</string>
+    <string name="title_activity_album">AlbumActivity</string>
 </resources>
