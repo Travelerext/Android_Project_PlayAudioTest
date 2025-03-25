@@ -4,7 +4,6 @@ import android.content.ContentUris
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Log
 
 class MediaReader(
     private val context: Context
